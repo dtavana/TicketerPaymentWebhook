@@ -5,12 +5,12 @@ import psycopg2
 app = Flask(__name__)
 app.debug = True
 app.config['SECRET_KEY'] = "@@:jrv7b))?7QB:RjQH\hB8"
-VOTES_FOR_REWARD = 20
+VOTES_FOR_REWARD = 30
 conn = psycopg2.connect("dbname=Ticketer user=postgres password=xw!HLUI&$889 host=localhost")
 cur = conn.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS payments(userid bigint, paymentid varchar);")
 conn.commit()
-cur.execute("CREATE TABLE IF NOT EXISTS votes(userid bigint, count smallint);")
+cur.execute("CREATE TABLE IF NOT EXISTS votes(userid bigint PRIMARY KEY, count smallint);")
 conn.commit()
 
 @app.route('/api/donatewebhook', methods=['POST'])
@@ -49,7 +49,7 @@ def donatewebhook():
 def voteswebhook():
     if request.headers['Authorization'] != app.config['SECRET_KEY']:
         abort(404)
-    data = request.form
+    data = request.get_json()
     userid = int(data['user'])
     botid = int(data['bot'])
     vote_type = data['type']
@@ -61,15 +61,23 @@ def voteswebhook():
             vote_add = 1
         try:
             cur.execute("INSERT INTO votes (userid, count) VALUES (%s, %s);", (userid, vote_add))
+            conn.commit()
         except:
             conn.rollback()
             cur.execute("UPDATE votes SET count = count + %s WHERE userid = %s;", (vote_add, userid))
-        conn.commit()
+            conn.commit()
         
         cur.execute("SELECT count FROM votes WHERE userid = %s;", (userid,))
         cur_votes = cur.fetchone()
         cur_votes = cur_votes[0]
         if cur_votes >= VOTES_FOR_REWARD:
+            try:
+                cur.execute("INSERT INTO premium (userid, credits) VALUES (%s, 1);", (userid,))
+                conn.commit()
+            except:
+                conn.rollback()
+                cur.execute("UPDATE premium SET credits = credits + 1 WHERE userid = %s;", (userid,))
+                conn.commit()
             cur.execute("INSERT INTO votesqueue (userid, cur_votes, receiveCredit) VALUES (%s, %s, True);", (userid, cur_votes))
             conn.commit()
             cur.execute("DELETE FROM votes WHERE userid = %s;", (userid,))
