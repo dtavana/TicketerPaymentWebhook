@@ -17,7 +17,7 @@ conn.commit()
 def donatewebhook():
     if request.headers['authorization'] != app.config['SECRET_KEY']:
         abort(404)
-    data = request.form
+    data = request.get_json()
     userid = int(data['buyer_id'])
     guildid = int(data['guild_id'])
     txn_id = data['txn_id']
